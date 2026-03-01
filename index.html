@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Summit Sprint</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <main class="game-shell">
+      <header class="hud">
+        <h1>Summit Sprint</h1>
+        <div class="stats">
+          <span>Coins: <strong id="coins">0/0</strong></span>
+          <span>Lives: <strong id="lives">3</strong></span>
+        </div>
+      </header>
+
+      <section class="stage-wrap">
+        <canvas id="game" aria-label="Platformer game canvas"></canvas>
+        <p id="status">Reach the flag. Avoid spikes.</p>
+      </section>
+
+      <div class="controls">
+        <p>Controls: A/D or Arrow keys to move, W/Space/Up to jump.</p>
+        <button id="restart" type="button">Restart Run</button>
+      </div>
+
+      <div class="touch-controls" aria-label="Touch controls">
+        <button id="leftBtn" class="touch-btn" type="button">Left</button>
+        <button id="jumpBtn" class="touch-btn jump" type="button">Jump</button>
+        <button id="rightBtn" class="touch-btn" type="button">Right</button>
+      </div>
+    </main>
+
+    <script src="script.js"></script>
+  </body>
+</html>
