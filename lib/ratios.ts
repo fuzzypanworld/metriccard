@@ -19,47 +19,21 @@ export const RATIO_PRESETS: Record<RatioPreset, RatioConfig> = {
     height: 625,
     proOnly: false,
   },
-  landscape: {
-    id: "landscape",
-    label: "Landscape",
-    tag: "1.91:1",
-    description: "X card / LinkedIn / OG",
-    width: 500,
-    height: 262,
-    proOnly: true,
-  },
-  story: {
-    id: "story",
-    label: "Story",
-    tag: "9:16",
-    description: "IG Story / TikTok",
-    width: 500,
-    height: 889,
-    proOnly: true,
-  },
-  "credit-card": {
-    id: "credit-card",
-    label: "Credit Card",
-    tag: "1.586:1",
-    description: "Badge / card style",
-    width: 500,
-    height: 315,
-    proOnly: true,
-  },
   wide: {
     id: "wide",
     label: "Wide",
-    tag: "16:9",
-    description: "YouTube / presentations",
+    tag: "3:2",
+    description: "Nice card",
     width: 500,
-    height: 281,
-    proOnly: true,
+    height: 334,
+    proOnly: false,
   },
 };
 
-export const RATIO_LIST: RatioConfig[] = Object.values(RATIO_PRESETS);
+const RATIO_ORDER: RatioPreset[] = ["square", "portrait", "wide"];
+export const RATIO_LIST: RatioConfig[] = RATIO_ORDER.map((id) => RATIO_PRESETS[id]);
 
-export const DEFAULT_RATIO: RatioPreset = "square";
+export const DEFAULT_RATIO: RatioPreset = "wide";
 
 export function getRatioConfig(id: RatioPreset): RatioConfig {
   return RATIO_PRESETS[id];

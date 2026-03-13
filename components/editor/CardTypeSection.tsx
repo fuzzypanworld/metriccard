@@ -4,7 +4,7 @@ import type { CardType } from "../../lib/types";
 import { useEditor } from "./EditorProvider";
 
 const TYPES: { id: CardType; label: string }[] = [
-  { id: "text", label: "Text" },
+  { id: "text", label: "Metric" },
   { id: "growth", label: "Growth" },
   { id: "payout", label: "Payout" },
 ];

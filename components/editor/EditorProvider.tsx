@@ -9,13 +9,16 @@ import {
   useRef,
 } from "react";
 import type {
+  BadgeType,
   CardType,
+  CelebrateType,
   PlanMode,
   RatioPreset,
+  SceneType,
   ThemeMode,
-} from "../../lib/types";
-import { getRatioConfig } from "../../lib/ratios";
-import { exportNodeAsPng } from "../../lib/exportCardAsPng";
+} from "@/lib/types";
+import { getRatioConfig } from "@/lib/ratios";
+import { exportNodeAsPng } from "@/lib/exportCardAsPng";
 
 // ── State ──
 
@@ -25,16 +28,31 @@ interface EditorState {
   ratio: RatioPreset;
   plan: PlanMode;
   isDownloading: boolean;
+  // Identity
+  handle: string;
+  badge: BadgeType;
+  // Content — text / metric card
   text: string;
+  metricLabel: string;
+  metricStartDate: string;
+  metricEndDate: string;
+  metricStartValue: string;
+  metricEndValue: string;
+  metricPoints: number[]; // 8 values between start and end (linear by default)
+  // Content — growth
   growthStart: string;
   growthEnd: string;
   growthLabel: string;
-  growthTime: string;
+  growthDurationMonths: number;
+  // Content — payout
   payoutPlatform: string;
   payoutAmount: string;
   payoutTime: string;
   payoutSubtitle: string;
   payoutVerified: boolean;
+  // Style
+  scene: SceneType;
+  celebrate: CelebrateType;
 }
 
 const defaultText = `Shipped 2.4K new signups this week
@@ -43,21 +61,35 @@ CAC down 18.5%
 Revenue hit 171,24$ in one launch`;
 
 const initialState: EditorState = {
-  cardType: "text",
-  theme: "dark",
-  ratio: "square",
+  cardType: "growth",
+  theme: "light",
+  ratio: "wide",
   plan: "free",
   isDownloading: false,
+  handle: "",
+  badge: "none",
   text: defaultText,
+  metricLabel: "Revenue",
+  metricStartDate: (() => {
+    const d = new Date();
+    d.setMonth(d.getMonth() - 3);
+    return d.toISOString().slice(0, 10);
+  })(),
+  metricEndDate: new Date().toISOString().slice(0, 10),
+  metricStartValue: "0",
+  metricEndValue: "1200",
+  metricPoints: [150, 280, 220, 400, 380, 600, 750, 950],
   growthStart: "0",
   growthEnd: "2400",
   growthLabel: "Followers",
-  growthTime: "30 days",
+  growthDurationMonths: 6,
   payoutPlatform: "X",
   payoutAmount: "$171,240",
   payoutTime: "Last 30 days",
   payoutSubtitle: "First payout from creator revenue",
   payoutVerified: true,
+  scene: "aurora",
+  celebrate: "none",
 };
 
 // ── Actions ──
@@ -68,16 +100,26 @@ type EditorAction =
   | { type: "SET_RATIO"; payload: RatioPreset }
   | { type: "SET_PLAN"; payload: PlanMode }
   | { type: "SET_DOWNLOADING"; payload: boolean }
+  | { type: "SET_HANDLE"; payload: string }
+  | { type: "SET_BADGE"; payload: BadgeType }
   | { type: "SET_TEXT"; payload: string }
+  | { type: "SET_METRIC_LABEL"; payload: string }
+  | { type: "SET_METRIC_START_DATE"; payload: string }
+  | { type: "SET_METRIC_END_DATE"; payload: string }
+  | { type: "SET_METRIC_START_VALUE"; payload: string }
+  | { type: "SET_METRIC_END_VALUE"; payload: string }
+  | { type: "SET_METRIC_POINTS"; payload: number[] }
   | { type: "SET_GROWTH_START"; payload: string }
   | { type: "SET_GROWTH_END"; payload: string }
   | { type: "SET_GROWTH_LABEL"; payload: string }
-  | { type: "SET_GROWTH_TIME"; payload: string }
+  | { type: "SET_GROWTH_DURATION_MONTHS"; payload: number }
   | { type: "SET_PAYOUT_PLATFORM"; payload: string }
   | { type: "SET_PAYOUT_AMOUNT"; payload: string }
   | { type: "SET_PAYOUT_TIME"; payload: string }
   | { type: "SET_PAYOUT_SUBTITLE"; payload: string }
-  | { type: "SET_PAYOUT_VERIFIED"; payload: boolean };
+  | { type: "SET_PAYOUT_VERIFIED"; payload: boolean }
+  | { type: "SET_SCENE"; payload: SceneType }
+  | { type: "SET_CELEBRATE"; payload: CelebrateType };
 
 function editorReducer(state: EditorState, action: EditorAction): EditorState {
   switch (action.type) {
@@ -95,23 +137,51 @@ function editorReducer(state: EditorState, action: EditorAction): EditorState {
       if (action.payload === "free") {
         const currentConfig = getRatioConfig(state.ratio);
         if (currentConfig.proOnly) {
-          next.ratio = "square";
+          next.ratio = "wide";
         }
       }
       return next;
     }
     case "SET_DOWNLOADING":
       return { ...state, isDownloading: action.payload };
+    case "SET_HANDLE":
+      return { ...state, handle: action.payload };
+    case "SET_BADGE":
+      return { ...state, badge: action.payload };
     case "SET_TEXT":
       return { ...state, text: action.payload };
+    case "SET_METRIC_LABEL":
+      return { ...state, metricLabel: action.payload };
+    case "SET_METRIC_START_DATE":
+      return { ...state, metricStartDate: action.payload };
+    case "SET_METRIC_END_DATE":
+      return { ...state, metricEndDate: action.payload };
+    case "SET_METRIC_START_VALUE": {
+      const start = parseFloat(String(action.payload).replace(/[^0-9.-]/g, "")) || 0;
+      const end = parseFloat(String(state.metricEndValue).replace(/[^0-9.-]/g, "")) || 0;
+      const points = Array.from({ length: 8 }, (_, i) =>
+        start + (end - start) * ((i + 1) / 9)
+      );
+      return { ...state, metricStartValue: action.payload, metricPoints: points };
+    }
+    case "SET_METRIC_END_VALUE": {
+      const start = parseFloat(String(state.metricStartValue).replace(/[^0-9.-]/g, "")) || 0;
+      const end = parseFloat(String(action.payload).replace(/[^0-9.-]/g, "")) || 0;
+      const points = Array.from({ length: 8 }, (_, i) =>
+        start + (end - start) * ((i + 1) / 9)
+      );
+      return { ...state, metricEndValue: action.payload, metricPoints: points };
+    }
+    case "SET_METRIC_POINTS":
+      return { ...state, metricPoints: action.payload };
     case "SET_GROWTH_START":
       return { ...state, growthStart: action.payload };
     case "SET_GROWTH_END":
       return { ...state, growthEnd: action.payload };
     case "SET_GROWTH_LABEL":
       return { ...state, growthLabel: action.payload };
-    case "SET_GROWTH_TIME":
-      return { ...state, growthTime: action.payload };
+    case "SET_GROWTH_DURATION_MONTHS":
+      return { ...state, growthDurationMonths: action.payload };
     case "SET_PAYOUT_PLATFORM":
       return { ...state, payoutPlatform: action.payload };
     case "SET_PAYOUT_AMOUNT":
@@ -122,6 +192,10 @@ function editorReducer(state: EditorState, action: EditorAction): EditorState {
       return { ...state, payoutSubtitle: action.payload };
     case "SET_PAYOUT_VERIFIED":
       return { ...state, payoutVerified: action.payload };
+    case "SET_SCENE":
+      return { ...state, scene: action.payload };
+    case "SET_CELEBRATE":
+      return { ...state, celebrate: action.payload };
     default:
       return state;
   }

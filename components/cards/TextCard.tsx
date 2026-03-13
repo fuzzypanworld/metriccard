@@ -1,171 +1,286 @@
 "use client";
 
-import { Fragment, useMemo } from "react";
-import type { ThemeMode, RatioPreset } from "../../lib/types";
-import { getRatioConfig } from "../../lib/ratios";
+import { useMemo, useState, useCallback, useRef } from "react";
+import type { ThemeMode, RatioPreset, BadgeType, SceneType } from "@/lib/types";
+import { getRatioConfig } from "@/lib/ratios";
+import { formatCompactNumber, parseNumericInput } from "@/lib/number";
 import CardShell from "./CardShell";
 
+const METRIC_POINTS_COUNT = 8;
+
 interface TextCardProps {
-  text: string;
+  metricLabel: string;
+  metricStartDate: string;
+  metricEndDate: string;
+  metricStartValue: string;
+  metricEndValue: string;
+  metricPoints: number[];
   theme: ThemeMode;
   ratio: RatioPreset;
   showWatermark: boolean;
+  handle?: string;
+  badge?: BadgeType;
+  scene?: SceneType;
+  onPointsChange?: (points: number[]) => void;
 }
 
-const SPLIT_REGEX = /(\d+[\d.,KkMm$%]*)/g;
-const NUMBER_TOKEN_REGEX = /^\d+[\d.,KkMm$%]*$/;
-
-function extractNumbers(text: string): number[] {
-  const matches = text.match(/[\d,.]+/g);
-  if (!matches || matches.length === 0) return [];
-  return matches
-    .map((m) => parseFloat(m.replace(/,/g, "")))
-    .filter((n) => Number.isFinite(n));
-}
-
-function buildGrowthPath(
-  numbers: number[],
-  width: number,
-  height: number,
-  padX: number,
-  padY: number
-): { linePath: string; areaPath: string; points: { x: number; y: number }[] } {
-  const sorted = [...numbers].sort((a, b) => a - b);
-  const count = sorted.length;
-  if (count === 0) return { linePath: "", areaPath: "", points: [] };
-
-  const min = sorted[0];
-  const max = sorted[sorted.length - 1];
-  const range = Math.max(1, max - min);
-  const innerW = width - padX * 2;
-  const innerH = height - padY * 2;
-
-  const points = sorted.map((v, i) => {
-    const x = padX + (count === 1 ? innerW / 2 : (i / (count - 1)) * innerW);
-    const y = padY + innerH - ((v - min) / range) * innerH;
-    return { x, y };
-  });
-
-  if (count === 1) {
-    const p = points[0];
-    const linePath = `M ${padX} ${p.y} L ${width - padX} ${p.y}`;
-    const areaPath = `${linePath} L ${width - padX} ${height - padY} L ${padX} ${height - padY} Z`;
-    return { linePath, areaPath, points: [{ x: padX, y: p.y }, { x: width - padX, y: p.y }] };
-  }
-
-  const linePath = points
-    .map((p, i) => `${i === 0 ? "M" : "L"} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`)
-    .join(" ");
-  const last = points[points.length - 1];
-  const first = points[0];
-  const areaPath = `${linePath} L ${last.x} ${height - padY} L ${first.x} ${height - padY} Z`;
-
-  return { linePath, areaPath, points };
+function formatAxisDate(iso: string): string {
+  if (!iso) return "";
+  const d = new Date(iso + "T12:00:00");
+  return d.toLocaleDateString("en-US", { month: "short", year: "numeric" });
 }
 
 export default function TextCard({
-  text,
+  metricLabel,
+  metricStartDate,
+  metricEndDate,
+  metricStartValue,
+  metricEndValue,
+  metricPoints,
   theme,
   ratio,
   showWatermark,
+  handle,
+  badge,
+  scene,
+  onPointsChange,
 }: TextCardProps) {
-  const lines = text.split("\n");
   const isDark = theme === "dark";
   const config = getRatioConfig(ratio);
-  const isCompact = config.height < 350;
+  const isCompact = config.height < 360;
+  const editable = typeof onPointsChange === "function";
 
-  const headerClasses = isDark ? "text-slate-400" : "text-slate-500";
-  const highlightClasses = isDark ? "text-blue-400" : "text-blue-500";
+  const startVal = parseNumericInput(metricStartValue);
+  const endVal = parseNumericInput(metricEndValue);
+  const points = useMemo(() => {
+    const arr = [...metricPoints];
+    while (arr.length < METRIC_POINTS_COUNT) {
+      const i = arr.length;
+      arr.push(startVal + (endVal - startVal) * ((i + 1) / (METRIC_POINTS_COUNT + 1)));
+    }
+    return arr.slice(0, METRIC_POINTS_COUNT);
+  }, [metricPoints, startVal, endVal]);
 
-  const numbers = useMemo(() => extractNumbers(text), [text]);
-  const graphW = 420;
-  const graphH = 100;
-  const padX = 8;
-  const padY = 10;
-  const { linePath, areaPath, points } = useMemo(
-    () => buildGrowthPath(numbers, graphW, graphH, padX, padY),
-    [numbers]
+  const allValues = useMemo(
+    () => [startVal, ...points, endVal],
+    [startVal, endVal, points]
   );
-  const showGraph = points.length >= 2 && !isCompact;
+
+  const valueMin = Math.min(...allValues);
+  const valueMax = Math.max(...allValues);
+  const valueRange = Math.max(1, valueMax - valueMin);
+  const paddedMin = valueMin - valueRange * 0.1;
+  const paddedMax = valueMax + valueRange * 0.1;
+  const paddedRange = Math.max(1, paddedMax - paddedMin);
+
+  const xLeft = 44;
+  const xRight = 380;
+  const yTop = isCompact ? 20 : 16;
+  const yBottom = isCompact ? 108 : 112;
+  const chartWidth = xRight - xLeft;
+  const chartHeight = yBottom - yTop;
+
+  const svgWidth = 420;
+  const svgHeight = 140;
+
+  const coords = useMemo(() => {
+    return allValues.map((v, i) => {
+      const t = allValues.length === 1 ? 0 : i / (allValues.length - 1);
+      const x = xLeft + t * chartWidth;
+      const y = yBottom - ((v - paddedMin) / paddedRange) * chartHeight;
+      return { x, y, value: v };
+    });
+  }, [allValues, paddedMin, paddedRange, chartWidth, xLeft, yBottom, chartHeight]);
+
+  const linePath = coords
+    .map((p, i) => `${i === 0 ? "M" : "L"} ${p.x.toFixed(2)} ${p.y.toFixed(2)}`)
+    .join(" ");
+  const areaPath = `${linePath} L ${xRight} ${yBottom} L ${xLeft} ${yBottom} Z`;
+
+  const yTicks = [0, 0.5, 1].map((t) => ({
+    y: yBottom - t * chartHeight,
+    value: paddedMin + t * paddedRange,
+  }));
+
+  const labelClasses = "text-slate-500";
+  const displayLabel = metricLabel.trim() || "Metric";
+
+  const [draggingIndex, setDraggingIndex] = useState<number | null>(null);
+  const chartRef = useRef<SVGSVGElement>(null);
+
+  const valueFromY = useCallback(
+    (clientY: number) => {
+      const svg = chartRef.current;
+      if (!svg) return null;
+      const rect = svg.getBoundingClientRect();
+      const svgY = ((clientY - rect.top) / rect.height) * svgHeight;
+      const norm = (yBottom - svgY) / chartHeight;
+      const value = paddedMin + norm * paddedRange;
+      return value;
+    },
+    [chartHeight, paddedMin, paddedRange, svgHeight, yBottom]
+  );
+
+  const handlePointerDown = useCallback(
+    (e: React.PointerEvent, index: number) => {
+      if (!editable || index < 1 || index > METRIC_POINTS_COUNT) return;
+      e.preventDefault();
+      setDraggingIndex(index);
+      (e.target as Element).setPointerCapture?.(e.pointerId);
+    },
+    [editable]
+  );
+
+  const handlePointerMove = useCallback(
+    (e: React.PointerEvent) => {
+      if (draggingIndex === null) return;
+      const value = valueFromY(e.clientY);
+      if (value == null) return;
+      // Clamp to 0 minimum and reasonable max (3x the end value or start value, whichever is larger)
+      const maxBound = Math.max(endVal, startVal, 1) * 3;
+      const clamped = Math.max(0, Math.min(maxBound, Math.round(value)));
+      const next = [...points];
+      next[draggingIndex - 1] = clamped;
+      onPointsChange?.(next);
+    },
+    [draggingIndex, valueFromY, points, onPointsChange, startVal, endVal]
+  );
+
+  const handlePointerUp = useCallback(() => {
+    setDraggingIndex(null);
+  }, []);
 
   return (
-    <CardShell theme={theme} ratio={ratio} showWatermark={showWatermark}>
-      <p className={`text-[10px] font-semibold uppercase tracking-[0.2em] ${headerClasses}`}>
-        MetricCard
-      </p>
+    <CardShell theme={theme} ratio={ratio} showWatermark={showWatermark} handle={handle} badge={badge} scene={scene}>
+      <div className="flex w-full flex-col items-center text-center">
+        <p className="text-base font-bold text-slate-800">
+          {displayLabel}
+        </p>
+        <p className={`mt-0.5 text-sm ${labelClasses}`}>
+          {metricStartDate && metricEndDate
+            ? `${formatAxisDate(metricStartDate)} – ${formatAxisDate(metricEndDate)}`
+            : "Set start & end date"}
+        </p>
 
-      <div className={`mt-4 space-y-1 ${isCompact ? "flex-1 overflow-hidden" : ""}`}>
-        {lines.map((line, lineIndex) => {
-          if (line.length === 0) {
-            return (
-              <p
-                key={`line-${lineIndex}`}
-                className={`${isCompact ? "text-sm" : "text-lg"} font-semibold leading-snug tracking-tight`}
-              >
-                &nbsp;
-              </p>
-            );
-          }
-
-          const segments = line.split(SPLIT_REGEX);
-
-          return (
-            <p
-              key={`line-${lineIndex}`}
-              className={`${isCompact ? "text-sm" : "text-lg"} font-semibold leading-snug tracking-tight`}
-            >
-              {segments.map((segment, segmentIndex) =>
-                NUMBER_TOKEN_REGEX.test(segment) ? (
-                  <span
-                    key={`segment-${lineIndex}-${segmentIndex}`}
-                    className={highlightClasses}
-                  >
-                    {segment}
-                  </span>
-                ) : (
-                  <Fragment key={`segment-${lineIndex}-${segmentIndex}`}>
-                    {segment}
-                  </Fragment>
-                )
-              )}
-            </p>
-          );
-        })}
-      </div>
-
-      {showGraph && (
-        <div className="mt-auto mb-1">
+        <div className={`${isCompact ? "mt-2" : "mt-4"} w-full max-w-[420px]`}>
           <svg
-            viewBox={`0 0 ${graphW} ${graphH}`}
-            className="w-full"
+            ref={chartRef}
+            viewBox={`0 0 ${svgWidth} ${svgHeight}`}
+            className={`w-full touch-none ${editable ? "cursor-crosshair" : ""}`}
             role="img"
-            aria-label="Growth trend"
+            aria-label="Metric chart"
+            preserveAspectRatio="xMidYMid meet"
+            onPointerMove={handlePointerMove}
+            onPointerUp={handlePointerUp}
+            onPointerLeave={handlePointerUp}
           >
             <defs>
-              <linearGradient id="text-graph-line-grad" x1="0" y1="0" x2="1" y2="0">
+              <linearGradient id="metric-text-line" x1="0" y1="0" x2="1" y2="0">
                 <stop offset="0%" stopColor="#38bdf8" />
                 <stop offset="100%" stopColor="#3b82f6" />
               </linearGradient>
-              <linearGradient id="text-graph-area-grad" x1="0" y1="0" x2="0" y2="1">
+              <linearGradient id="metric-text-area" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="0%" stopColor={isDark ? "rgba(59,130,246,0.30)" : "rgba(59,130,246,0.18)"} />
                 <stop offset="100%" stopColor="rgba(59,130,246,0)" />
               </linearGradient>
-              <filter id="text-glow" x="-20%" y="-20%" width="140%" height="140%">
-                <feGaussianBlur stdDeviation="2" result="blur" />
-                <feMerge>
-                  <feMergeNode in="blur" />
-                  <feMergeNode in="SourceGraphic" />
-                </feMerge>
-              </filter>
             </defs>
-            <path d={areaPath} fill="url(#text-graph-area-grad)" className="graph-area-animate" />
-            <path d={linePath} fill="none" stroke="url(#text-graph-line-grad)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" filter="url(#text-glow)" className="graph-line-animate" />
-            <circle cx={points[0].x} cy={points[0].y} r="2.5" className={isDark ? "fill-slate-500" : "fill-slate-300"} />
-            <circle cx={points[points.length - 1].x} cy={points[points.length - 1].y} r="4" className="fill-blue-500 graph-endpoint-pulse" />
-            <circle cx={points[points.length - 1].x} cy={points[points.length - 1].y} r="1.5" className="fill-blue-100" />
+
+            {yTicks.map((tick, i) => (
+              <g key={i}>
+                <line
+                  x1={xLeft}
+                  x2={xRight}
+                  y1={tick.y}
+                  y2={tick.y}
+                  className={isDark ? "stroke-slate-800" : "stroke-slate-200"}
+                  strokeWidth="0.75"
+                  strokeDasharray={i === 0 ? "0" : "3 5"}
+                />
+                <text
+                  x={xLeft - 6}
+                  y={tick.y + 3}
+                  textAnchor="end"
+                  className={isDark ? "fill-slate-500" : "fill-slate-400"}
+                  fontSize="8"
+                  fontWeight="500"
+                >
+                  {formatCompactNumber(tick.value)}
+                </text>
+              </g>
+            ))}
+
+            <line
+              x1={xLeft}
+              x2={xLeft}
+              y1={yTop}
+              y2={yBottom}
+              className={isDark ? "stroke-slate-700" : "stroke-slate-300"}
+              strokeWidth="1"
+            />
+            <line
+              x1={xLeft}
+              x2={xRight}
+              y1={yBottom}
+              y2={yBottom}
+              className={isDark ? "stroke-slate-700" : "stroke-slate-300"}
+              strokeWidth="1"
+            />
+
+            <path d={areaPath} fill="url(#metric-text-area)" />
+            <path
+              d={linePath}
+              fill="none"
+              stroke="url(#metric-text-line)"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+
+            {coords.map((p, i) => {
+              const isMiddle = i >= 1 && i <= METRIC_POINTS_COUNT;
+              const isDraggable = editable && isMiddle;
+              return (
+                <circle
+                  key={i}
+                  cx={p.x}
+                  cy={p.y}
+                  r={isMiddle && editable ? 8 : 4}
+                  className={
+                    isDraggable
+                      ? "fill-blue-500 stroke-2 stroke-white cursor-grab active:cursor-grabbing hover:fill-blue-400"
+                      : isDark
+                        ? "fill-slate-600"
+                        : "fill-slate-300"
+                  }
+                  style={isDraggable ? { touchAction: "none" } : undefined}
+                  onPointerDown={(e) => handlePointerDown(e, i)}
+                />
+              );
+            })}
+
+            <text
+              x={xLeft}
+              y={yBottom + 12}
+              textAnchor="start"
+              className={isDark ? "fill-slate-500" : "fill-slate-400"}
+              fontSize="9"
+              fontWeight="500"
+            >
+              {metricStartDate ? formatAxisDate(metricStartDate) : ""}
+            </text>
+            <text
+              x={xRight}
+              y={yBottom + 12}
+              textAnchor="end"
+              className={isDark ? "fill-slate-500" : "fill-slate-400"}
+              fontSize="9"
+              fontWeight="500"
+            >
+              {metricEndDate ? formatAxisDate(metricEndDate) : ""}
+            </text>
           </svg>
         </div>
-      )}
+      </div>
     </CardShell>
   );
 }

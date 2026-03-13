@@ -10,8 +10,9 @@
   },
   "dependencies": {
     "@vercel/analytics": "^1.5.0",
+    "firebase": "^12.10.0",
     "html-to-image": "^1.11.13",
-    "next": "14.2.26",
+    "next": "^16.1.6",
     "react": "18.3.1",
     "react-dom": "18.3.1"
   },

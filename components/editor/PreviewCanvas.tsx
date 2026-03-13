@@ -1,22 +1,31 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { getRatioConfig } from "../../lib/ratios";
+import { getRatioConfig } from "@/lib/ratios";
 import { useEditor } from "./EditorProvider";
 import TextCard from "../cards/TextCard";
 import GrowthCard from "../cards/GrowthCard";
 import PayoutCard from "../cards/PayoutCard";
 
 export default function PreviewCanvas() {
-  const { state, exportCardRef } = useEditor();
+  const { state, dispatch, exportCardRef } = useEditor();
   const shellRef = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(1);
 
   const config = getRatioConfig(state.ratio);
   const cardW = config.width;
   const cardH = config.height;
-  const isPro = state.plan === "pro";
-  const showWatermark = !isPro;
+  const showWatermark = true;
+
+  // Shared props for all card types
+  const sharedProps = {
+    theme: state.theme,
+    ratio: state.ratio,
+    showWatermark,
+    handle: state.handle,
+    badge: state.badge,
+    scene: state.scene,
+  } as const;
 
   useEffect(() => {
     const node = shellRef.current;
@@ -38,16 +47,17 @@ export default function PreviewCanvas() {
   }, [cardW, cardH]);
 
   const activeCard = useMemo(() => {
-    if (state.cardType === "growth") {
+    if (state.cardType === "text") {
       return (
-        <GrowthCard
-          startValue={state.growthStart}
-          endValue={state.growthEnd}
-          label={state.growthLabel}
-          timePeriod={state.growthTime}
-          theme={state.theme}
-          ratio={state.ratio}
-          showWatermark={showWatermark}
+        <TextCard
+          metricLabel={state.metricLabel}
+          metricStartDate={state.metricStartDate}
+          metricEndDate={state.metricEndDate}
+          metricStartValue={state.metricStartValue}
+          metricEndValue={state.metricEndValue}
+          metricPoints={state.metricPoints}
+          onPointsChange={(points) => dispatch({ type: "SET_METRIC_POINTS", payload: points })}
+          {...sharedProps}
         />
       );
     }
@@ -60,26 +70,61 @@ export default function PreviewCanvas() {
           timePeriod={state.payoutTime}
           subtitle={state.payoutSubtitle}
           verified={state.payoutVerified}
-          theme={state.theme}
-          ratio={state.ratio}
-          showWatermark={showWatermark}
+          {...sharedProps}
         />
       );
     }
 
     return (
-      <TextCard
-        text={state.text}
-        theme={state.theme}
-        ratio={state.ratio}
-        showWatermark={showWatermark}
+      <GrowthCard
+        startValue={state.growthStart}
+        endValue={state.growthEnd}
+        label={state.growthLabel}
+        durationMonths={state.growthDurationMonths}
+        {...sharedProps}
+      />
+    );
+  }, [state, showWatermark, dispatch]);
+
+  const exportCard = useMemo(() => {
+    if (state.cardType === "text") {
+      return (
+        <TextCard
+          metricLabel={state.metricLabel}
+          metricStartDate={state.metricStartDate}
+          metricEndDate={state.metricEndDate}
+          metricStartValue={state.metricStartValue}
+          metricEndValue={state.metricEndValue}
+          metricPoints={state.metricPoints}
+          {...sharedProps}
+        />
+      );
+    }
+    if (state.cardType === "payout") {
+      return (
+        <PayoutCard
+          platform={state.payoutPlatform}
+          amount={state.payoutAmount}
+          timePeriod={state.payoutTime}
+          subtitle={state.payoutSubtitle}
+          verified={state.payoutVerified}
+          {...sharedProps}
+        />
+      );
+    }
+    return (
+      <GrowthCard
+        startValue={state.growthStart}
+        endValue={state.growthEnd}
+        label={state.growthLabel}
+        durationMonths={state.growthDurationMonths}
+        {...sharedProps}
       />
     );
   }, [state, showWatermark]);
 
   return (
     <>
-      {/* Visible preview */}
       <div
         ref={shellRef}
         className="flex h-full items-center justify-center overflow-hidden p-6"
@@ -101,12 +146,11 @@ export default function PreviewCanvas() {
         </div>
       </div>
 
-      {/* Off-screen export target */}
       <div
         aria-hidden="true"
         className="pointer-events-none fixed -left-[10000px] top-0 opacity-0"
       >
-        <div ref={exportCardRef}>{activeCard}</div>
+        <div ref={exportCardRef}>{exportCard}</div>
       </div>
     </>
   );

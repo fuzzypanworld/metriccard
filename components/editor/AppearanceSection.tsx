@@ -23,22 +23,6 @@ export default function AppearanceSection() {
       >
         {state.theme === "dark" ? "Dark" : "Light"}
       </button>
-      <button
-        type="button"
-        onClick={() =>
-          dispatch({
-            type: "SET_PLAN",
-            payload: state.plan === "free" ? "pro" : "free",
-          })
-        }
-        className={`flex-1 rounded-lg border px-3 py-2 text-[11px] font-semibold ${
-          state.plan === "pro"
-            ? "border-blue-200 bg-blue-50 text-blue-600"
-            : "border-slate-200 bg-white text-slate-600"
-        }`}
-      >
-        {state.plan === "pro" ? "Pro" : "Free"}
-      </button>
     </div>
   );
 }

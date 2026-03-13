@@ -10,9 +10,16 @@ export default function ExportButton() {
       type="button"
       onClick={handleDownload}
       disabled={state.isDownloading}
-      className="w-full rounded-lg bg-slate-900 py-2.5 text-sm font-semibold text-white shadow transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-400"
+      className="w-full rounded-lg bg-slate-900 py-3 text-center shadow transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-400"
     >
-      {state.isDownloading ? "Exporting..." : "Download PNG"}
+      <span className="block text-sm font-semibold text-white">
+        {state.isDownloading ? "Exporting..." : "Download PNG"}
+      </span>
+      {!state.isDownloading && (
+        <span className="block mt-0.5 text-[10px] text-slate-400">
+          2x Resolution &middot; PNG Format
+        </span>
+      )}
     </button>
   );
 }

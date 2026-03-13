@@ -1,8 +1,8 @@
 "use client";
 
-import EditorProvider from "../../components/editor/EditorProvider";
-import Sidebar from "../../components/editor/Sidebar";
-import PreviewCanvas from "../../components/editor/PreviewCanvas";
+import EditorProvider from "@/components/editor/EditorProvider";
+import Sidebar from "@/components/editor/Sidebar";
+import PreviewCanvas from "@/components/editor/PreviewCanvas";
 
 export default function EditorPage() {
   return (

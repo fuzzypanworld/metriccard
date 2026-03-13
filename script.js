@@ -2,9 +2,7 @@ const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 
 const coinsEl = document.getElementById("coins");
-const livesEl = document.getElementById("lives");
 const statusEl = document.getElementById("status");
-const restartBtn = document.getElementById("restart");
 
 const leftBtn = document.getElementById("leftBtn");
 const rightBtn = document.getElementById("rightBtn");
@@ -65,7 +63,6 @@ const player = {
 const level = createLevel();
 const totalCoins = level.coins.length;
 coinsEl.textContent = `0/${totalCoins}`;
-livesEl.textContent = String(player.lives);
 
 function createLevel() {
   const platforms = [
@@ -184,7 +181,6 @@ function resetGame() {
   camera.y = 0;
   gameState = "playing";
   statusEl.textContent = "Reach the flag. Avoid spikes.";
-  livesEl.textContent = String(player.lives);
   coinsEl.textContent = `0/${totalCoins}`;
 }
 
@@ -314,7 +310,6 @@ window.addEventListener("keyup", (event) => {
   }
 });
 
-restartBtn.addEventListener("click", resetGame);
 window.addEventListener("resize", resizeCanvas);
 resizeCanvas();
 
@@ -447,11 +442,10 @@ function loseLife(reason) {
   }
 
   player.lives -= 1;
-  livesEl.textContent = String(player.lives);
 
   if (player.lives <= 0) {
     gameState = "gameover";
-    statusEl.textContent = `${reason} Game over. Press Restart.`;
+    statusEl.textContent = `${reason} Game over.`;
     return;
   }
 

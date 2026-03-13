@@ -4,13 +4,22 @@ export type PlanMode = "free" | "pro";
 
 export type CardType = "text" | "growth" | "payout";
 
-export type RatioPreset =
-  | "square"
-  | "portrait"
-  | "landscape"
-  | "story"
-  | "credit-card"
-  | "wide";
+export type BadgeType = "none" | "blue" | "gold" | "gray";
+
+export type SceneType =
+  | "studio"
+  | "noise"
+  | "grid"
+  | "spotlight"
+  | "aurora"
+  | "onyx"
+  | "hologram"
+  | "nebula"
+  | "minimal";
+
+export type CelebrateType = "none" | "confetti" | "balloons";
+
+export type RatioPreset = "square" | "portrait" | "wide";
 
 export interface RatioConfig {
   id: RatioPreset;
